@@ -18,7 +18,28 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import *
 from pyspark.sql.functions import *
 
-
+SET hive.execution.engine = tez;
+SET tez.queue.name=${queue_name};
+SET mapreduce.job.queuename=${queue_name};
+SET mapred.map.tasks.speculative.execution = true;
+SET hive.exec.dynamic.partition=true;
+SET hive.exec.dynamic.partition.mode=nonstrict;
+SET hive.auto.convert.join=false;
+SET hive.vectorized.execution.enabled=true;
+SET hive.vectorized.execution.reduce.enabled = true;
+SET hive.exec.compress.output=false;
+SET hive.auto.convert.join=false;
+set tez.runtime.shuffle.fetch.buffer.percent=0.9; 
+set hive.mapjoin.hybridgrace.hashtable=false;
+set hive.tez.container.size=8000;
+set hive.tez.java.opts=-server -Djava.net.preferIPv4Stack=true -XX:NewRatio=8 -XX:+UseNUMA -XX:+UseG1GC -XX:+ResizeTLAB -XX:+PrintGCDetails -verbose:gc -XX:+PrintGCTimeStamps -Xmx6550m;
+set hive.exec.reducers.bytes.per.reducer=67108864;
+set hive.auto.convert.join.noconditionaltask.size=2147483648;
+set hive.exec.parallel=true;
+set hive.fetch.task.aggr=true;
+set hive.optimize.index.filter=true;
+set hive.exec.compress.output=false;
+set hive.tez.exec.print.summary=false;
 
 
 pathSapSiteCrossRef = "E://green_mercury//data//sample_data//sample.txt"
