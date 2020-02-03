@@ -1,4 +1,105 @@
-'''
+
+for (( i=30; i <= 40; ++i ))
+do
+start=`date --date="$i days ago" +%Y%m%d`
+echo $start
+    YEAR=`echo ${start:0:4}`
+    MONTH=`echo ${start:4:2}`
+    DAY=`echo ${start:6:2}`
+
+hdfs dfs -rm -r /data/rt/raw/public/pricing_integrity/raw_partitioned/sqoop/adr4/md012p/year=$YEAR/month=$MONTH/day=$DAY
+hdfs dfs -rm -r /data/rt/raw/public/pricing_integrity/raw_partitioned/sqoop/adr4/md013p/year=$YEAR/month=$MONTH/day=$DAY
+hdfs dfs -rm -r /data/rt/raw/public/pricing_integrity/raw_partitioned/sqoop/adr4/md018p/year=$YEAR/month=$MONTH/day=$DAY
+hdfs dfs -rm -r /data/rt/raw/public/pricing_integrity/raw_partitioned/sqoop/adr4/md019p/year=$YEAR/month=$MONTH/day=$DAY
+hdfs dfs -rm -r /data/rt/raw/public/pricing_integrity/raw_partitioned/sqoop/adr4/md495p/year=$YEAR/month=$MONTH/day=$DAY
+hdfs dfs -rm -r /data/rt/raw/public/pricing_integrity/raw_partitioned/sqoop/adr4/mn003p/year=$YEAR/month=$MONTH/day=$DAY
+done
+
+exit 0
+
+
+
+
+source ../config/shell.config
+$KINIT_COMMAND
+CURDTTM=`date +%Y%m%d%H%M%S`
+LOG_FILE_PREFIX=`echo $0 | awk -F'.' '{print $1}'`
+LOGFILE=$LOG_DIR/seq000A02_maintenance'_'$CURDTTM.log
+echo "LOG_FILE : "$LOGFILE
+
+
+
+for (( i=30; i <= 40; ++i ))
+do
+start=`date --date="$i days ago" +%Y%m%d`
+echo $start
+    YEAR=`echo ${start:0:4}`
+    MONTH=`echo ${start:4:2}`
+    DAY=`echo ${start:6:2}`
+BEELINE_URL="beeline -u 'jdbc:hive2://pla-w02hdp07.walgreens.com:2181,pla-w02hdp08.walgreens.com:2181,pla-w02hdp09.walgreens.com:2181,pla-w02hdp16.walgreens.com:2181,pla-w02hdp18.walgreens.com:2181/;serviceDiscoveryMode=zooKeeper;zooKeeperNamespace=hiveserver2;principal=hive/_HOST@PROD.HADOOP.WALGREENS.COM;transportMode=binary;httpPath=cliservice' --showHeader=false --outputformat=csv2 --verbose true --hivevar TODAY=$(date +"%Y-%m-%d") --hivevar MAX_CYLG_DATETIME=$MAX_CYLG_DATETIME --hivevar YEAR='$YEAR' --hivevar MONTH='$MONTH' --hivevar DAY='$DAY'"
+echo $BEELINE_URL
+$BEELINE_URL -i $HIVE_CONFIG_FILE -f $HIVE_DIR/maintenance/seq000A02_blue_uranium_maintenance_hive.sql >> $LOGFILE 2>>$LOGFILE
+
+done
+
+
+
+
+BEELINE_URL="beeline -u 'jdbc:hive2://pla-w02hdp07.walgreens.com:2181,pla-w02hdp08.walgreens.com:2181,pla-w02hdp09.walgreens.com:2181,pla-w02hdp16.walgreens.com:2181,pla-w02hdp18.walgreens.com:2181/;serviceDiscoveryMode=zooKeeper;zooKeeperNamespace=hiveserver2;principal=hive/_HOST@PROD.HADOOP.WALGREENS.COM;transportMode=binary;httpPath=cliservice' --showHeader=false --outputformat=csv2 --verbose true --hivevar TODAY=$(date +"%Y-%m-%d") --hivevar MAX_CYLG_DATETIME=$MAX_CYLG_DATETIME --hivevar YEAR='$YEAR' --hivevar MONTH='$MONTH' --hivevar DAY='$DAY'"
+
+
+
+
+
+sqoop import -Dmapred.job.queue.name=$JOB_QUEUE -Dmapreduce.map.output.compress=false -Dmapreduce.output.fileoutputformat.compress=false -Doraoop.timestamp.string=false -Dorg.apache.sqoop.splitter.allow_text_splitter=true \
+--connect jdbc:oracle:thin:@$PCMS_SERVER:1521/$PCMS_SID \
+--username $PCMS_UID \
+--password-file /user/$USER_ID/.pcms-file \
+--query """SELECT A.*
+FROM (SELECT PB.PRIB_CODE AS STORE,
+             ) A WHERE \$CONDITIONS""" \
+--split-by STORE \
+--fields-terminated-by '\001' \
+--lines-terminated-by '\n' \
+--delete-target-dir --target-dir $HDFS_ROOT_DIR_PATH_RAW_TMP/blur_pcms_pricing_temp \
+-m 1 >> $LOGFILE 2>>$LOGFILE
+
+
+
+
+
+
+while read line; do    
+    echo $line
+        STR_NBR=`echo $line | awk -F'_' '{print $2}' |awk -F'-' '{print $1}'`
+        echo "extracting "$STR_NBR
+        echo "extracting "$STR_NBR >> $LOGFILE 2>>$LOGFILE
+        unzip -o $line
+        CURDTTM=`date +%Y%m%d%H%M`
+        #mv activeprice.txt     $STR_NBR.$CURDTTM.activeprice.txt
+        mv activepromotion.txt $STR_NBR.$CURDTTM.activepromotion.txt
+        mv sitelevel.txt       $STR_NBR.$CURDTTM.sitelevel.txt
+        mv pbcbatchcount.txt   $STR_NBR.$CURDTTM.pbcbatchcount.txt
+        mv priceconstant*.txt  $STR_NBR.$CURDTTM.priceconstant.txt
+                
+        #mv $STR_NBR.$CURDTTM.refined_active_markdown.txt activemarkdown  
+        #mv $STR_NBR.$CURDTTM.activeprice.txt     activeprice              
+        mv $STR_NBR.$CURDTTM.activepromotion.txt activepromotion
+        mv $STR_NBR.$CURDTTM.sitelevel.txt       sitelevel
+        mv $STR_NBR.$CURDTTM.pbcbatchcount.txt   pbcbatchcount
+        mv $STR_NBR.$CURDTTM.priceconstant.txt $ROOT_LOCAL/sap_ibarra/$DT_TODAY.priceconstant/
+        rm -f *.txt
+        rm -f $line
+        #sleep 1
+done < filelist.fl
+
+
+DT_TODAY=`date +%Y%m%d`
+echo $DT_TODAY
+
+
+
+
 Created on Jul 9, 2019
 
 @author: MAX
